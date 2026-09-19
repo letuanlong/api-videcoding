@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Auth;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Password;
 
 class ChangePasswordRequest extends FormRequest
 {
@@ -16,16 +16,14 @@ class ChangePasswordRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
-     return [
+        return [
             'current_password' => ['required', 'string'],
-            // Rule 'confirmed' sẽ yêu cầu gửi kèm field 'new_password_confirmation'
-            'new_password'     => ['required', 'string', 'min:8', 'confirmed'],
+            // 'confirmed' yêu cầu gửi kèm password_confirmation
+            'password'         => ['required', 'string', 'confirmed', 'different:current_password', Password::defaults()],
         ];
     }
 }

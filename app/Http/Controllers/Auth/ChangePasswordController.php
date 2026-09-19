@@ -2,26 +2,21 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Actions\Auth\ChangePasswordAction;
-use App\Exceptions\InvalidCurrentPasswordException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
 class ChangePasswordController extends Controller
 {
     public function __invoke(ChangePasswordRequest $request, ChangePasswordAction $action): JsonResponse
     {
-        try {
-            $action->execute($request->user(), $request->validated());
+        $action->execute(
+            $request->user(),
+            $request->validated('current_password'),
+            $request->validated('password'),
+        );
 
-            return response()->json([
-                'message' => 'Đổi mật khẩu thành công!'
-            ], 200);
-
-        } catch (InvalidCurrentPasswordException $e) {
-            return response()->json([
-                'message' => $e->getMessage()
-            ], 400);
-        }
+        return ApiResponse::success(message: 'Password changed successfully. Please log in again.');
     }
 }
