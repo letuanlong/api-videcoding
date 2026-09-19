@@ -1,27 +1,42 @@
 <?php
 namespace App\Actions\Auth;
 
+use App\Actions\AuditLogs\RecordAuditLogAction;
+use App\Enums\AuditAction;
 use App\Exceptions\InvalidCurrentPasswordException;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class ChangePasswordAction
 {
-    /**
-     * Thực thi việc kiểm tra và cập nhật mật khẩu mới
-     */
-    public function execute(User $user, array $data): void
+    public function __construct(private readonly RecordAuditLogAction $audit)
     {
-        // 1. Kiểm tra mật khẩu hiện tại
-        if (! Hash::check($data['current_password'], $user->password)) {
-            throw new InvalidCurrentPasswordException('Mật khẩu hiện tại không chính xác.');
+    }
+
+    /**
+     * Kiểm tra mật khẩu hiện tại rồi đặt mật khẩu mới.
+     *
+     * @throws InvalidCurrentPasswordException
+     */
+    public function execute(
+        User $user,
+        #[\SensitiveParameter] string $currentPassword,
+        #[\SensitiveParameter] string $newPassword,
+    ): void {
+        if (! Hash::check($currentPassword, $user->password)) {
+            throw new InvalidCurrentPasswordException();
         }
 
-        // 2. Cập nhật mật khẩu mới & LƯU VÀO DB
-        $user->password = Hash::make($data['new_password']);
-        $user->save();
+        DB::transaction(function () use ($user, $newPassword) {
+            // Cast 'hashed' tự băm mật khẩu khi gán
+            $user->password = $newPassword;
+            $user->save();
 
-        // 3. Xóa toàn bộ token cũ
-        $user->tokens()->delete();
+            // Thu hồi toàn bộ token: mật khẩu cũ và mọi phiên đăng nhập cũ đều hết hiệu lực
+            $user->tokens()->delete();
+
+            $this->audit->execute(AuditAction::ChangePassword, $user, $user);
+        });
     }
 }
