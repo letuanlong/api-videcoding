@@ -1,54 +1,54 @@
 # vibecoding-api — User Management CMS & RBAC
 
-REST API (Laravel 12, PHP 8.2) kèm giao diện CMS (Vue 3) để quản lý người dùng theo vai trò **SUPERADMIN / ADMIN / USER**.
-Xác thực bằng Bearer token (Laravel Sanctum). Ngoài phần quản lý user còn có module đặt hàng (`/api/orders`) có từ trước.
+REST API (Laravel 12, PHP 8.2) with a Vue 3 admin CMS for managing users by role: **SUPERADMIN / ADMIN / USER**.
+Authentication uses Bearer tokens (Laravel Sanctum). Besides user management there is a pre-existing orders module (`/api/orders`).
 
-Nội dung: [Cài đặt](#1-cài-đặt) · [Môi trường](#2-biến-môi-trường) · [Database và seeder](#3-database-và-seeder) · [Xác thực](#4-xác-thực) · [Phân quyền](#5-phân-quyền) · [API](#6-api) · [Frontend](#7-frontend-cms) · [Kiểm thử](#8-kiểm-thử) · [Kiến trúc](#9-kiến-trúc-code)
+Contents: [Setup](#1-setup) · [Environment](#2-environment-variables) · [Database and seeders](#3-database-and-seeders) · [Authentication](#4-authentication) · [Authorization](#5-authorization) · [API](#6-api) · [Frontend](#7-frontend-cms) · [Testing](#8-testing) · [Architecture](#9-code-architecture)
 
 ---
 
-## 1. Cài đặt
+## 1. Setup
 
-Yêu cầu: PHP ≥ 8.2, Composer, Node.js ≥ 20, MySQL/MariaDB (hoặc SQLite).
+Requirements: PHP ≥ 8.2, Composer, Node.js ≥ 20, MySQL/MariaDB (or SQLite).
 
 ```bash
 composer install
 cp .env.example .env            # Windows PowerShell: Copy-Item .env.example .env
 php artisan key:generate
-# chỉnh DB_* trong .env, rồi:
+# edit DB_* in .env, then:
 php artisan migrate
-php artisan db:seed             # tạo 3 tài khoản mẫu (xem mục 3)
-php artisan storage:link        # để ảnh đại diện truy cập được qua /storage
+php artisan db:seed             # creates 3 sample accounts (see section 3)
+php artisan storage:link        # makes avatars reachable through /storage
 
 npm install
-npm run build                   # build CMS vào public/build
+npm run build                   # builds the CMS into public/build
 ```
 
-Chạy:
+Run:
 
 ```bash
 php artisan serve               # API: http://127.0.0.1:8000/api   CMS: http://127.0.0.1:8000/cms
-npm run dev                     # (tùy chọn) Vite dev server, hot reload khi sửa frontend
+npm run dev                     # (optional) Vite dev server, hot reload while editing the frontend
 ```
 
-### Chạy bằng XAMPP (Apache) trong `htdocs`
+### Running with XAMPP (Apache) inside `htdocs`
 
-1. Mở **XAMPP Control Panel**, bấm Start cho **Apache** và **MySQL**.
-2. Làm các bước ở mục 1 một lần (`composer install`, `.env`, `migrate`, `db:seed`, `storage:link`, `npm install`, `npm run build`).
-3. Mở trình duyệt:
+1. Open the **XAMPP Control Panel** and start **Apache** and **MySQL**.
+2. Do the steps in section 1 once (`composer install`, `.env`, `migrate`, `db:seed`, `storage:link`, `npm install`, `npm run build`).
+3. Open your browser:
 
-| Việc | URL |
+| What | URL |
 |---|---|
-| CMS (giao diện) | `http://localhost/vibecoding-api/public/cms` |
-| Gõ tắt (tự chuyển sang địa chỉ trên) | `http://localhost/vibecoding-api/cms` |
+| CMS (UI) | `http://localhost/vibecoding-api/public/cms` |
+| Shortcut (redirects to the address above) | `http://localhost/vibecoding-api/cms` |
 | API | `http://localhost/vibecoding-api/public/api/...` |
 
-Đăng nhập bằng tài khoản mẫu ở mục 3 (vd. `superadmin@example.com` / `Password@123`).
+Sign in with a sample account from section 3 (e.g. `superadmin@example.com` / `Password@123`).
 
-- **Sửa frontend xong phải `npm run build`** thì Apache mới thấy thay đổi (Apache chỉ phục vụ file trong `public/build`). Muốn tự cập nhật khi sửa code thì chạy thêm `npm run dev` (Vite dev server).
-- Frontend tự nhận đường dẫn gốc từ Laravel nên cùng một bản build chạy được ở `/vibecoding-api/public/cms` lẫn `/cms`, không cần cấu hình.
-- **File `.htaccess` ở gốc dự án là bắt buộc khi để dự án trong `htdocs`:** thiếu nó thì `http://localhost/vibecoding-api/.env` (chứa `APP_KEY`, cấu hình DB), `.git/`, `vendor/`, `storage/logs/` bị Apache phục vụ trực tiếp cho bất kỳ ai truy cập được máy bạn (XAMPP mặc định lắng nghe mọi giao diện mạng). Đừng xóa file này.
-- **Cách tốt hơn (tùy chọn): VirtualHost trỏ thẳng vào `public/`**, khi đó chỉ thư mục `public/` được phơi ra và có URL gọn `http://vibecoding.test/cms`. Thêm vào `C:\xampp\apache\conf\extra\httpd-vhosts.conf`:
+- **Run `npm run build` after every frontend change**, otherwise Apache will not see it (Apache only serves the files in `public/build`). To rebuild automatically while you edit, also run `npm run dev` (Vite dev server).
+- The frontend reads its base path from Laravel, so the same build works at `/vibecoding-api/public/cms` and at `/cms` without any configuration.
+- **The `.htaccess` file at the project root is required when the project lives in `htdocs`.** Without it, Apache serves `http://localhost/vibecoding-api/.env` (which contains `APP_KEY` and the database configuration), `.git/`, `vendor/` and `storage/logs/` directly to anyone who can reach your machine (XAMPP listens on all network interfaces by default). Do not delete this file.
+- **Better option (optional): a VirtualHost pointing straight at `public/`.** Only the `public/` directory is then exposed, and you get a clean URL such as `http://vibecoding.test/cms`. Add this to `C:\xampp\apache\conf\extra\httpd-vhosts.conf`:
 
   ```apache
   <VirtualHost *:80>
@@ -61,111 +61,111 @@ npm run dev                     # (tùy chọn) Vite dev server, hot reload khi 
   </VirtualHost>
   ```
 
-  Thêm dòng `127.0.0.1 vibecoding.test` vào `C:\Windows\System32\drivers\etc\hosts` (cần quyền Administrator), rồi Restart Apache.
-- **Khắc phục:** trang trắng hoặc file `/build/...` 404 → chưa `npm run build`; API 404 → kiểm tra Apache đã bật `mod_rewrite` (XAMPP mặc định đã bật); ảnh đại diện không hiện → chưa `php artisan storage:link`.
+  Add the line `127.0.0.1 vibecoding.test` to `C:\Windows\System32\drivers\etc\hosts` (requires Administrator rights), then restart Apache.
+- **Troubleshooting:** blank page or `/build/...` returning 404 → you have not run `npm run build`; API returning 404 → check that Apache has `mod_rewrite` enabled (it is by default in XAMPP); avatars not showing → you have not run `php artisan storage:link`.
 
-## 2. Biến môi trường
+## 2. Environment variables
 
-| Biến | Ý nghĩa | Ghi chú |
+| Variable | Meaning | Notes |
 |---|---|---|
-| `DB_*` | Kết nối database | Test dùng SQLite `:memory:` (cấu hình trong `phpunit.xml`) |
-| `SANCTUM_EXPIRATION` | Thời hạn Bearer token (phút) | Mặc định **480**. Token quá hạn bị từ chối 401 |
-| `APP_DEBUG` | Hiện chi tiết lỗi | **Bắt buộc `false` ở production**. Khi `true`, lỗi 500 in cả nội dung exception |
-| `APP_URL` | URL gốc của ứng dụng | Dùng cho lệnh console. URL ảnh đại diện lấy theo host của request nên không phụ thuộc biến này |
+| `DB_*` | Database connection | Tests use SQLite `:memory:` (configured in `phpunit.xml`) |
+| `SANCTUM_EXPIRATION` | Bearer token lifetime (minutes) | Default **480**. Expired tokens are rejected with 401 |
+| `APP_DEBUG` | Show error details | **Must be `false` in production.** When `true`, a 500 response includes the exception message |
+| `APP_URL` | Application base URL | Used by console commands. Avatar URLs are built from the request host, so they do not depend on this variable |
 
-## 3. Database và seeder
+## 3. Database and seeders
 
-Migration (`database/migrations`):
+Migrations (`database/migrations`):
 
-- `users`: thêm `phone`, `role` (mặc định `user`), `status` (mặc định `active`), `avatar`, `last_login_at`, `deleted_at` (xóa mềm). `email` unique, **kể cả với tài khoản đã xóa mềm**.
-- `audit_logs`: `user_id`, `action`, `target_type`, `target_id`, `old_values`, `new_values`, `ip_address`, `user_agent`, `created_at`. Chỉ ghi thêm, không sửa.
-- Migration chạy được lên dữ liệu có sẵn (user cũ tự nhận `role=user`, `status=active`) và rollback được.
+- `users`: adds `phone`, `role` (default `user`), `status` (default `active`), `avatar`, `last_login_at` and `deleted_at` (soft delete). `email` is unique, **including for soft-deleted accounts**.
+- `audit_logs`: `user_id`, `action`, `target_type`, `target_id`, `old_values`, `new_values`, `ip_address`, `user_agent`, `created_at`. Append-only.
+- Migrations run on top of existing data (existing users automatically get `role=user`, `status=active`) and can be rolled back.
 
-Seeder (`php artisan db:seed`, chạy lại nhiều lần an toàn, không tạo trùng, không ghi đè mật khẩu đã đổi):
+Seeder (`php artisan db:seed`; safe to run repeatedly: it never creates duplicates and never overwrites a password that was changed):
 
-| Email | Role | Mật khẩu (chỉ dùng dev) |
+| Email | Role | Password (development only) |
 |---|---|---|
 | `superadmin@example.com` | superadmin | `Password@123` |
 | `admin@example.com` | admin | `Password@123` |
 | `user@example.com` | user | `Password@123` |
 
-## 4. Xác thực
+## 4. Authentication
 
-- `POST /api/login` trả `token`. Gửi kèm mọi request sau đó: `Authorization: Bearer <token>`.
-- Mỗi lần đăng nhập thu hồi token cũ (một thiết bị tại một thời điểm). Đăng nhập giới hạn 5 lần/phút.
-- **Token bị thu hồi ngay** khi: đăng xuất, tài khoản bị chuyển sang `inactive`/`blocked`, bị xóa, bị admin reset mật khẩu, hoặc tự đổi mật khẩu.
-- Tài khoản không `active` bị chặn 403 ở mọi API (kể cả khi còn token). Chỉ `logout` vẫn dùng được.
-- Đăng nhập sai email hoặc mật khẩu đều trả cùng một lỗi 401 (không lộ email có tồn tại). Trạng thái tài khoản chỉ được tiết lộ **sau khi** mật khẩu đúng.
+- `POST /api/login` returns a `token`. Send it with every later request: `Authorization: Bearer <token>`.
+- Each login revokes the previous token (one device at a time). Login is limited to 5 attempts per minute.
+- **A token is revoked immediately** when the user logs out, is switched to `inactive`/`blocked`, is deleted, has their password reset by an admin, or changes their own password.
+- An account that is not `active` is rejected with 403 on every API (even if it still holds a token). Only `logout` keeps working.
+- A wrong email and a wrong password return the same 401 error (the API does not reveal whether an email exists). The account status is disclosed only **after** the password has been verified.
 
-### Định dạng response
+### Response format
 
 ```jsonc
-// Thành công
+// Success
 { "success": true, "message": "Login successful.", "data": { ... } }
-// Danh sách
+// List
 { "success": true, "data": [ ... ], "meta": { "current_page": 1, "per_page": 20, "total": 100, "last_page": 5 } }
-// Lỗi
+// Error
 { "success": false, "message": "Validation failed.", "errors": { "email": ["The email has already been taken."] } }
 ```
 
-| Mã | Ý nghĩa | `message` |
+| Code | Meaning | `message` |
 |---|---|---|
-| 401 | Chưa đăng nhập / token sai / hết hạn / sai thông tin đăng nhập | `Unauthenticated.` / `Invalid credentials.` |
-| 403 | Không đủ quyền, hoặc tài khoản inactive/blocked | `You do not have permission to perform this action.` |
-| 404 | Không tồn tại hoặc đã xóa mềm | `User not found.` / `Resource not found.` |
-| 422 | Dữ liệu không hợp lệ (kèm `errors`) | `Validation failed.` |
-| 429 | Quá số lần thử | `Too Many Attempts.` (kèm header `Retry-After`) |
-| 500 | Lỗi hệ thống, không lộ chi tiết khi `APP_DEBUG=false` | `Server error.` |
+| 401 | Not logged in / invalid or expired token / wrong credentials | `Unauthenticated.` / `Invalid credentials.` |
+| 403 | Not allowed, or account is inactive/blocked | `You do not have permission to perform this action.` |
+| 404 | Does not exist or was soft-deleted | `User not found.` / `Resource not found.` |
+| 422 | Invalid input (includes `errors`) | `Validation failed.` |
+| 429 | Too many attempts | `Too Many Attempts.` (with a `Retry-After` header) |
+| 500 | Server error; details are hidden when `APP_DEBUG=false` | `Server error.` |
 
-## 5. Phân quyền
+## 5. Authorization
 
-Backend là nơi quyết định quyền (`UserPolicy` + middleware `role`/`active`). Frontend chỉ ẩn/hiện cho tiện dùng.
+The backend decides access (`UserPolicy` + the `role`/`active` middleware). The frontend only hides or shows things for convenience.
 
-| Chức năng | SUPERADMIN | ADMIN | USER |
+| Capability | SUPERADMIN | ADMIN | USER |
 |---|:-:|:-:|:-:|
-| Đăng nhập, đăng xuất, xem dashboard | ✓ | ✓ | ✓ |
-| Xem/sửa hồ sơ của mình, đổi mật khẩu của mình | ✓ | ✓ | ✓ |
-| Xem danh sách user | ✓ | ✓ | ✗ |
-| Tạo ADMIN | ✓ | ✗ | ✗ |
-| Tạo USER | ✓ | ✓ | ✗ |
-| Xem / sửa / xóa / đổi trạng thái / reset mật khẩu **ADMIN** | ✓ | ✗ | ✗ |
-| Xem / sửa / xóa / đổi trạng thái / reset mật khẩu **USER** | ✓ | ✓ | ✗ |
-| Xem SUPERADMIN khác (chỉ đọc) | ✓ | ✗ | ✗ |
-| Xem audit log | ✓ | ✗ | ✗ |
-| Tự xóa / tự khóa / tự đổi role qua API quản trị | ✗ | ✗ | ✗ |
-| Tạo hoặc nâng ai đó lên SUPERADMIN | ✗ | ✗ | ✗ |
+| Log in, log out, view dashboard | ✓ | ✓ | ✓ |
+| View/edit own profile, change own password | ✓ | ✓ | ✓ |
+| View the user list | ✓ | ✓ | ✗ |
+| Create ADMIN | ✓ | ✗ | ✗ |
+| Create USER | ✓ | ✓ | ✗ |
+| View / edit / delete / change status / reset password of an **ADMIN** | ✓ | ✗ | ✗ |
+| View / edit / delete / change status / reset password of a **USER** | ✓ | ✓ | ✗ |
+| View another SUPERADMIN (read-only) | ✓ | ✗ | ✗ |
+| View audit logs | ✓ | ✗ | ✗ |
+| Delete / block / change the role of oneself through the admin API | ✗ | ✗ | ✗ |
+| Create or promote anyone to SUPERADMIN | ✗ | ✗ | ✗ |
 
-Chi tiết đáng chú ý:
+Notable details:
 
-- SUPERADMIN **không** có đặc quyền vượt Policy: không sửa/xóa/khóa được SUPERADMIN khác, kể cả chính mình. Vì vậy không thể xảy ra tình huống "hết quản trị viên cao nhất". Tài khoản SUPERADMIN chỉ tạo bằng seeder/lệnh.
-- Danh sách mặc định của SUPERADMIN gồm ADMIN + USER. Lọc `role=superadmin` để xem (chỉ đọc) các SUPERADMIN. ADMIN lọc `role=admin|superadmin` nhận danh sách rỗng.
-- Kiểm tra role/trạng thái chạy **trước** route-model-binding nên người không có quyền không dò được id nào có thật (luôn 403, không phân biệt 404).
-- Truy cập bản ghi ngoài quyền trả **403** (không phải 404); `role` không nằm trong `$fillable`, chỉ được gán tường minh sau khi qua Policy (chống mass assignment).
-- Mật khẩu: 8–72 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt (áp dụng khi tạo, reset, đổi mật khẩu).
+- SUPERADMIN has **no** privilege beyond the policy: it cannot edit, delete or block another SUPERADMIN, or itself. This makes it impossible to end up with no top-level administrator. SUPERADMIN accounts are created only by the seeder or a command.
+- The default SUPERADMIN list contains ADMIN + USER accounts. Filter with `role=superadmin` to view (read-only) the SUPERADMIN accounts. An ADMIN filtering by `role=admin|superadmin` receives an empty list.
+- Role/status checks run **before** route-model-binding, so someone without permission cannot probe for existing ids (always 403, never distinguishable from 404).
+- Accessing a record outside your permission returns **403** (not 404). `role` is not in `$fillable`; it is only assigned explicitly after passing the policy (mass-assignment protection).
+- Passwords: 8–72 characters with upper and lower case letters, a number and a symbol (applies when creating, resetting and changing a password).
 
 ## 6. API
 
-Tiền tố `/api`. Ký hiệu: 🔓 công khai · 🔑 cần token · 👑 chỉ SUPERADMIN · 🛡 SUPERADMIN + ADMIN.
+Prefix `/api`. Legend: 🔓 public · 🔑 token required · 👑 SUPERADMIN only · 🛡 SUPERADMIN + ADMIN.
 
-| Method | Endpoint | Quyền | Mô tả |
+| Method | Endpoint | Access | Description |
 |---|---|---|---|
-| POST | `/login` | 🔓 | Đăng nhập, trả `user` + `token` |
-| POST | `/logout` | 🔑 | Thu hồi token hiện tại |
-| GET | `/dashboard` | 🔑 | Thống kê theo role (`stats` chỉ có với SUPERADMIN/ADMIN) |
-| GET | `/profile` | 🔑 | Hồ sơ của mình |
-| PUT | `/profile` | 🔑 | Sửa `name`, `phone`, `avatar` (mục dưới) |
-| POST | `/profile/change-password` | 🔑 | Đổi mật khẩu, thu hồi mọi token |
-| GET | `/admin/users` | 🛡 | Danh sách: `search`, `role`, `status`, `page`, `per_page` |
-| POST | `/admin/users` | 🛡 | Tạo user |
-| GET | `/admin/users/{id}` | 🛡 | Chi tiết |
-| PUT | `/admin/users/{id}` | 🛡 | Cập nhật `name`, `email`, `phone`, `role`, `status` |
-| PATCH | `/admin/users/{id}/status` | 🛡 | Đổi trạng thái |
-| DELETE | `/admin/users/{id}` | 🛡 | Xóa mềm |
-| POST | `/admin/users/{id}/reset-password` | 🛡 | Đặt lại mật khẩu, thu hồi token của user đó |
+| POST | `/login` | 🔓 | Log in, returns `user` + `token` |
+| POST | `/logout` | 🔑 | Revoke the current token |
+| GET | `/dashboard` | 🔑 | Role-based statistics (`stats` only for SUPERADMIN/ADMIN) |
+| GET | `/profile` | 🔑 | Own profile |
+| PUT | `/profile` | 🔑 | Update `name`, `phone`, `avatar` (see below) |
+| POST | `/profile/change-password` | 🔑 | Change password, revokes all tokens |
+| GET | `/admin/users` | 🛡 | List: `search`, `role`, `status`, `page`, `per_page` |
+| POST | `/admin/users` | 🛡 | Create a user |
+| GET | `/admin/users/{id}` | 🛡 | Details |
+| PUT | `/admin/users/{id}` | 🛡 | Update `name`, `email`, `phone`, `role`, `status` |
+| PATCH | `/admin/users/{id}/status` | 🛡 | Change status |
+| DELETE | `/admin/users/{id}` | 🛡 | Soft delete |
+| POST | `/admin/users/{id}/reset-password` | 🛡 | Reset the password, revokes that user's tokens |
 | GET | `/admin/audit-logs` | 👑 | `user`, `action`, `date_from`, `date_to`, `page`, `per_page` |
-| GET/POST | `/orders` | 🔑 | Đặt hàng / danh sách đơn của mình (module có từ trước) |
+| GET/POST | `/orders` | 🔑 | Place an order / list own orders (pre-existing module) |
 
-### Ví dụ
+### Examples
 
 ```http
 POST /api/login
@@ -175,70 +175,70 @@ POST /api/login
 ```
 
 ```http
-POST /api/admin/users          (Authorization: Bearer <token của ADMIN/SUPERADMIN>)
+POST /api/admin/users          (Authorization: Bearer <ADMIN/SUPERADMIN token>)
 { "name": "Nguyen Van A", "email": "a@example.com", "phone": "0900000000",
   "password": "Password@123", "password_confirmation": "Password@123",
   "role": "user", "status": "active" }
 → 201 { "success": true, "message": "User created successfully.", "data": { "id": 12, "role": "user", ... } }
 ```
 
-Mỗi user trong `data` có `abilities` (`update`, `delete`, `change_status`, `reset_password`) cho biết người đang xem được làm gì với bản ghi đó, để frontend ẩn/hiện nút mà không phải lặp lại ma trận quyền.
+Each user in `data` carries `abilities` (`update`, `delete`, `change_status`, `reset_password`) describing what the current viewer may do with that record, so the frontend can show or hide buttons without duplicating the permission matrix.
 
-**Phân trang:** `per_page` chỉ nhận `10`, `20` (mặc định), `50`, `100`. Giá trị khác quay về 20, không báo lỗi.
-**Tìm kiếm:** theo `name`, `email`, `phone` ở mức database (`LIKE`, không phân biệt hoa thường), kết hợp được với `role`, `status` và phân trang.
+**Pagination:** `per_page` accepts only `10`, `20` (default), `50` and `100`. Any other value falls back to 20 without an error.
+**Search:** by `name`, `email` and `phone` at the database level (`LIKE`, case-insensitive), combinable with `role`, `status` and pagination.
 
-**Ảnh đại diện:** gửi `multipart/form-data`, ảnh JPG/PNG/WebP ≤ 2 MB, kiểm tra theo **nội dung file** (không tin tên/đuôi file; SVG bị từ chối). PHP không đọc được multipart với `PUT`, nên gửi `POST /api/profile` kèm trường `_method=PUT`. Gửi JSON `{"avatar": null}` để xóa ảnh.
+**Avatar:** send `multipart/form-data` with a JPG/PNG/WebP image up to 2 MB. It is validated by **file content** (the name/extension is not trusted; SVG is rejected). PHP does not parse multipart bodies for `PUT`, so send `POST /api/profile` with the field `_method=PUT`. Send JSON `{"avatar": null}` to remove the avatar.
 
-**Trường bị bỏ qua:** `PUT /api/profile` chỉ nhận `name`, `phone`, `avatar`; `email`, `role`, `status`... gửi lên đều bị bỏ qua.
+**Ignored fields:** `PUT /api/profile` accepts only `name`, `phone` and `avatar`; `email`, `role`, `status` and anything else you send is ignored.
 
 ### Audit log
 
-Ghi các hành động `LOGIN`, `LOGOUT`, `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `CHANGE_STATUS`, `RESET_PASSWORD`, `UPDATE_PROFILE`, `CHANGE_PASSWORD` cùng người thực hiện, IP, user agent và giá trị cũ/mới (chỉ các trường thay đổi). Ghi trong cùng transaction với nghiệp vụ. **Không bao giờ lưu mật khẩu hay token** (mọi khóa chứa `password`, `token`, `secret` bị loại), và mật khẩu cũng được ẩn khỏi stack trace trong log ứng dụng (`#[\SensitiveParameter]`).
+Records `LOGIN`, `LOGOUT`, `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `CHANGE_STATUS`, `RESET_PASSWORD`, `UPDATE_PROFILE` and `CHANGE_PASSWORD`, together with the actor, IP address, user agent and old/new values (changed fields only). It is written in the same transaction as the business operation. **Passwords and tokens are never stored** (every key containing `password`, `token` or `secret` is dropped), and passwords are also hidden from stack traces in the application log (`#[\SensitiveParameter]`).
 
 ## 7. Frontend (CMS)
 
-Vue 3 + Vue Router + Pinia + Tailwind 4, nằm ở `resources/js/cms`, phục vụ tại **`/cms`** (mọi đường dẫn con trả cùng một trang SPA). Chạy được ở gốc domain (`/cms`) lẫn trong thư mục con của XAMPP (`/vibecoding-api/public/cms`): Laravel ghi đường dẫn gốc thật vào `data-cms-base` / `data-api-base` của thẻ `#app` (CSP chặn script inline nên không truyền bằng biến JavaScript), bản build dùng đường dẫn tương đối, và chỉ chấp nhận đường dẫn nội bộ nên dữ liệu trong HTML không thể trỏ API sang origin khác.
+Vue 3 + Vue Router + Pinia + Tailwind 4, located in `resources/js/cms` and served at **`/cms`** (every sub-path returns the same SPA page). It works both at the domain root (`/cms`) and inside an XAMPP sub-folder (`/vibecoding-api/public/cms`): Laravel writes the real base paths into the `data-cms-base` / `data-api-base` attributes of the `#app` element (the CSP blocks inline scripts, so they are not passed as JavaScript variables), the build uses relative asset URLs, and only internal paths are accepted, so data in the HTML cannot point the API at another origin.
 
-- Trang: Login, Dashboard, User Management (danh sách/tạo/chi tiết/sửa + modal xóa, đổi trạng thái, reset mật khẩu), Audit Logs, Profile.
-- Menu theo role: SUPERADMIN (Dashboard, User Management, Audit Logs, Profile), ADMIN (bỏ Audit Logs), USER (Dashboard, Profile). Vào thẳng URL không được phép sẽ hiện trang 403.
-- Bộ lọc, trang và số dòng của danh sách nằm trong URL (F5 và nút Back giữ nguyên).
-- **Lưu token:** trong `sessionStorage` (sống qua F5, mất khi đóng tab, không dùng `localStorage`). Mật khẩu không bao giờ được lưu. 401 ở bất kỳ API nào (hết hạn/bị thu hồi) tự xóa phiên và chuyển về login kèm trang đang xem.
-- **Bảo mật trang:** CSP (`script-src 'self'`, `frame-ancestors 'none'`...), `X-Frame-Options`, `X-Content-Type-Options`; nội dung do người dùng nhập luôn hiển thị dạng chữ (không dùng `v-html`); chỉ chấp nhận `redirect` nội bộ sau đăng nhập (chống open redirect). CSP tự tắt khi chạy `npm run dev`.
-- Token nằm trong `sessionStorage` nên XSS là rủi ro chính: giữ CSP, không thêm script bên thứ ba, không dùng `v-html` với dữ liệu người dùng.
+- Pages: Login, Dashboard, User Management (list / create / detail / edit plus delete, change-status and reset-password modals), Audit Logs, Profile.
+- Role-based menu: SUPERADMIN (Dashboard, User Management, Audit Logs, Profile), ADMIN (no Audit Logs), USER (Dashboard, Profile). Opening a forbidden URL directly shows a 403 page.
+- The list filters, page and page size live in the URL (reload and the Back button keep them).
+- **Token storage:** in `sessionStorage` (survives a reload, is lost when the tab closes, and `localStorage` is never used). Passwords are never stored. A 401 from any API (expired/revoked token) clears the session and returns to the login page, remembering the page being viewed.
+- **Page security:** CSP (`script-src 'self'`, `frame-ancestors 'none'`, ...), `X-Frame-Options`, `X-Content-Type-Options`; user-entered content is always rendered as text (no `v-html`); only internal `redirect` targets are accepted after login (open-redirect protection). The CSP is switched off automatically while `npm run dev` is running.
+- The token lives in `sessionStorage`, so XSS is the main risk: keep the CSP, do not add third-party scripts, and never use `v-html` with user data.
 
-## 8. Kiểm thử
+## 8. Testing
 
 ```bash
-php artisan test        # backend (Pest): 413 test
-npm test                # frontend (Vitest + Vue Test Utils): 372 test
-npm run test:e2e        # E2E thật: Laravel + bản build + Chrome/Edge thật, DB SQLite tạm (34 bước)
+php artisan test        # backend (Pest): 413 tests
+npm test                # frontend (Vitest + Vue Test Utils): 372 tests
+npm run test:e2e        # real E2E: Laravel + the build + a real Chrome/Edge, temporary SQLite DB (34 steps)
 ```
 
-- **Backend:** xác thực, Policy (bảng 3 role × 3 role × các quyền), CRUD, IDOR, mass assignment, mật khẩu không lộ (response, audit log, log ứng dụng), phân trang/tìm kiếm, upload ảnh theo nội dung file. Test dùng SQLite `:memory:` nên **không kiểm được `lockForUpdate` và một số hành vi collation của MySQL**. Để chạy trên MySQL thật: tạo DB tạm rồi `DB_CONNECTION=mysql DB_DATABASE=<db_tam> php artisan test` (biến môi trường ghi đè `phpunit.xml`), xong thì xóa DB. **Không chạy test lên DB dev.**
-- **Frontend:** util, store, router guard, từng component và trang, cùng kịch bản QA 3 role chạy trên toàn bộ ứng dụng (chỉ tầng mạng là giả).
-- **E2E:** cần PHP trong PATH và đã cài Chrome hoặc Edge (không tải trình duyệt). Script tự build, tạo DB tạm, nạp dữ liệu, khởi động máy chủ rồi dọn dẹp. Ảnh chụp khi có bước fail nằm ở `e2e/artifacts`. Biến tùy chọn: `E2E_PORT`, `E2E_HEADED=1`. E2E chạy trên máy chủ PHP tích hợp ở **gốc domain**; cách chạy trong thư mục con của XAMPP (Apache, `.htaccess`) đã được kiểm tra thủ công bằng Chrome nhưng **chưa có test tự động**.
+- **Backend:** authentication, the policy (a 3 roles × 3 roles × permissions matrix), CRUD, IDOR, mass assignment, passwords never leaking (responses, audit logs, application logs), pagination/search, and content-based upload validation. Tests use SQLite `:memory:`, so they **cannot exercise `lockForUpdate` or some MySQL collation behaviour**. To run against real MySQL, create a temporary database and run `DB_CONNECTION=mysql DB_DATABASE=<temp_db> php artisan test` (environment variables override `phpunit.xml`), then drop the database. **Never run the tests against your development database.**
+- **Frontend:** utilities, stores, router guards, every component and page, plus role-based QA scenarios that run on the whole application (only the network layer is mocked).
+- **E2E:** requires PHP in your PATH and an installed Chrome or Edge (no browser is downloaded). The script builds the frontend, creates a temporary database, seeds it, starts a server and cleans up afterwards. Screenshots of failing steps are written to `e2e/artifacts`. Optional variables: `E2E_PORT`, `E2E_HEADED=1`. The E2E suite runs on PHP's built-in server at the **domain root**; running inside an XAMPP sub-folder (Apache, `.htaccess`) was verified manually with Chrome but **has no automated test yet**.
 
-## 9. Kiến trúc code
+## 9. Code architecture
 
-Mỗi endpoint là một lớp mỏng theo mẫu:
+Every endpoint is a thin layer following this pattern:
 
 ```
 routes/api.php → Controller (invokable) → FormRequest (validate + authorize)
-               → Action::execute() (toàn bộ logic nghiệp vụ, trong DB::transaction khi ghi)
-               → Resource (định dạng JSON)   |   Exception nghiệp vụ tự render response
+               → Action::execute() (all business logic, inside DB::transaction for writes)
+               → Resource (JSON formatting)   |   domain Exception that renders its own response
 ```
 
-| Thư mục | Vai trò |
+| Directory | Role |
 |---|---|
-| `app/Actions/{Auth,Users,Profile,AuditLogs,Dashboard,Orders}` | Logic nghiệp vụ |
-| `app/DTOs` | Dữ liệu vào dạng `readonly class` |
-| `app/Enums` | `UserRole` (nguồn duy nhất của ma trận quyền), `UserStatus`, `AuditAction` |
-| `app/Policies/UserPolicy.php` | Quyết định ai được làm gì với user khác |
+| `app/Actions/{Auth,Users,Profile,AuditLogs,Dashboard,Orders}` | Business logic |
+| `app/DTOs` | Input data as `readonly class` |
+| `app/Enums` | `UserRole` (single source of truth for the permission matrix), `UserStatus`, `AuditAction` |
+| `app/Policies/UserPolicy.php` | Decides who may do what to another user |
 | `app/Http/Middleware` | `EnsureUserHasRole` (`role:`), `EnsureUserIsActive` (`active`), `CmsSecurityHeaders` |
-| `app/Support` | `ApiResponse` (định dạng chuẩn), `PerPage` |
-| `bootstrap/app.php` | Alias middleware, thứ tự ưu tiên middleware, chuẩn hóa mọi lỗi API |
-| `resources/js/cms` | Frontend CMS (api, stores, router, components, pages, utils, test) |
-| `e2e/run.mjs` | Bộ E2E trình duyệt thật |
-| `.htaccess` (gốc dự án) | Chỉ dành cho XAMPP/Apache khi dự án nằm trong `htdocs`: chặn Apache phục vụ trực tiếp `.env`, `.git`, `vendor`... (xem mục 1) |
+| `app/Support` | `ApiResponse` (standard format), `PerPage` |
+| `bootstrap/app.php` | Middleware aliases, middleware priority, standardised handling of every API error |
+| `resources/js/cms` | CMS frontend (api, stores, router, components, pages, utils, test) |
+| `e2e/run.mjs` | Real-browser E2E suite |
+| `.htaccess` (project root) | XAMPP/Apache only, when the project lives in `htdocs`: stops Apache from serving `.env`, `.git`, `vendor`... directly (see section 1) |
 
-Quy ước: message trả về của module User Management bằng tiếng Anh theo đặc tả; comment trong code bằng tiếng Việt.
+Conventions: API messages of the User Management module are in English, as specified; code comments are written in Vietnamese.
