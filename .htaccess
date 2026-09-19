@@ -1,0 +1,25 @@
+# Dành cho XAMPP/Apache khi dự án nằm trong htdocs và được mở bằng http://localhost/vibecoding-api/...
+#
+# Mọi request đều được chuyển vào public/, nên .env, .git, storage/, vendor/, artisan... nằm ngoài public/
+# KHÔNG BAO GIỜ được Apache phục vụ trực tiếp. (Không có file này thì http://localhost/vibecoding-api/.env
+# trả về nội dung file .env, gồm APP_KEY và cấu hình database.)
+#
+# Cách khuyến nghị hơn: trỏ DocumentRoot / VirtualHost thẳng vào thư mục public/ (xem README, mục XAMPP).
+# File này không ảnh hưởng `php artisan serve` và các môi trường đã trỏ DocumentRoot vào public/.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # URL cũ dạng /vibecoding-api/public/... vẫn dùng được: để nguyên, public/.htaccess sẽ xử lý tiếp
+    RewriteRule ^public/ - [L]
+
+    # Mọi đường dẫn khác được chuyển hướng sang public/ (vd. /vibecoding-api/cms -> /vibecoding-api/public/cms).
+    # Dùng chuyển hướng (không rewrite ngầm) để Laravel luôn thấy đúng đường dẫn gốc của nó.
+    # Đường dẫn không có thật trong public/ (kể cả .env, .git) sẽ rơi vào Laravel và trả 404.
+    # Tiền tố URL của thư mục (vd. /vibecoding-api/) được suy ra từ chính request nên đổi tên thư mục vẫn chạy;
+    # không dùng RewriteBase/đường dẫn tương đối vì Apache trên Windows sinh URL sai dạng /C:/xampp/...
+    RewriteCond %{REQUEST_URI}::$1 ^(.*?/)(.*)::\2$
+    RewriteRule ^(.*)$ %1public/$1 [R=302,L]
+</IfModule>
